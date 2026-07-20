@@ -1,0 +1,45 @@
+name: Daily spending report
+
+on:
+  # GitHub cron is in UTC and does NOT adjust for daylight saving time.
+  # 8:00 AM Pacific is 15:00 UTC (summer, PDT) or 16:00 UTC (winter, PST).
+  # We fire at BOTH; daily_report.py checks the local hour and only sends
+  # when it's actually 8 AM in America/Los_Angeles, so you get exactly one.
+  schedule:
+    - cron: "0 15 * * *"
+    - cron: "0 16 * * *"
+  # Lets you run it by hand from the Actions tab (sends immediately).
+  workflow_dispatch:
+    inputs:
+      force_send:
+        description: "Send now, ignoring the 8 AM check"
+        type: boolean
+        default: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send daily report
+        env:
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+          PLAID_ENV: ${{ secrets.PLAID_ENV }}
+          PLAID_ACCESS_TOKEN: ${{ secrets.PLAID_ACCESS_TOKEN }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          SMS_GATEWAYS: ${{ secrets.SMS_GATEWAYS }}
+          MONTHLY_BUDGET: ${{ secrets.MONTHLY_BUDGET }}
+          TIMEZONE: ${{ secrets.TIMEZONE }}
+          DELIVERY_HOUR: ${{ secrets.DELIVERY_HOUR }}
+          FORCE_SEND: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        run: python daily_report.py
