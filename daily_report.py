@@ -70,10 +70,11 @@ def build_report(transactions, today: date) -> str:
 
     # Plain ASCII only: keeps SMS in the cheap GSM-7 encoding (160 chars/segment
     # vs 70 for Unicode) and displays cleanly in the Windows console.
-    # Cross-platform date like "Sat Jul 19" (no leading zero, no %-d hack).
-    header_date = f"{yesterday:%a %b} {yesterday.day}"
-    lines = [f"Spending - {header_date}"]
-    lines.append(f"Yesterday: ${yday_spend:,.2f}")
+    # This becomes the email SUBJECT, which carrier gateways show as a "/ ... /"
+    # title bar at the top of the text. Sent every morning, so no date needed.
+    subject = "Spending"
+
+    lines = [f"Yesterday: ${yday_spend:,.2f}"]
 
     # Up to 5 biggest purchases from yesterday, largest first.
     purchases = sorted(
@@ -99,7 +100,7 @@ def build_report(transactions, today: date) -> str:
     else:
         lines.append(f"OVER by ${-remaining:,.0f}, {days_left} days to go")
 
-    return "\n".join(lines)
+    return subject, "\n".join(lines)
 
 
 def main():
@@ -119,12 +120,13 @@ def main():
     start = min(first_of_month, today - timedelta(days=1))
     transactions = fetch_transactions(client, start, today)
 
-    report = build_report(transactions, today)
-    print(report)
+    subject, body = build_report(transactions, today)
+    print(subject)
+    print(body)
     print("-" * 40)
 
     if config.SMS_GATEWAYS:
-        send_sms(report)
+        send_sms(body, subject)
         print(f"Sent to {len(config.SMS_GATEWAYS)} recipient(s).")
     else:
         print("No SMS_GATEWAYS set - printed only, nothing sent.")

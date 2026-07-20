@@ -29,7 +29,13 @@ PLAID_ENV = os.environ.get("PLAID_ENV", "sandbox").lower()
 # Saved by link_card.py after you connect the card once.
 PLAID_ACCESS_TOKEN = os.environ.get("PLAID_ACCESS_TOKEN", "")
 
-# --- Delivery: email-to-SMS gateway ---
+# --- Delivery channel ---
+# "email"  -> carrier email-to-SMS gateway (no Twilio/A2P needed; best-effort)
+# "twilio" -> Twilio SMS API (needs A2P 10DLC approval to reach US phones)
+# `or "email"` so an empty value (e.g. an unset GitHub secret) falls back safely.
+NOTIFY_CHANNEL = (os.environ.get("NOTIFY_CHANNEL") or "email").lower()
+
+# --- Channel: email-to-SMS gateway ---
 # We email each carrier's SMS gateway and it arrives as a normal text.
 # EMAIL_FROM is a Gmail address; EMAIL_APP_PASSWORD is a Gmail App Password
 # (not your normal login password — see README).
@@ -43,6 +49,15 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "465"))
 #   Verizon:   5551234567@vtext.com
 SMS_GATEWAYS = [
     a.strip() for a in os.environ.get("SMS_GATEWAYS", "").split(",") if a.strip()
+]
+
+# --- Channel: Twilio (used when NOTIFY_CHANNEL=twilio) ---
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")  # e.g. +14253997205
+# Comma-separated phone numbers in E.164, e.g. "+12065551234,+12065555678"
+SMS_RECIPIENTS = [
+    n.strip() for n in os.environ.get("SMS_RECIPIENTS", "").split(",") if n.strip()
 ]
 
 # --- Budget & schedule ---

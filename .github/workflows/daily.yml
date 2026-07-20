@@ -35,9 +35,14 @@ jobs:
           PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
           PLAID_ENV: ${{ secrets.PLAID_ENV }}
           PLAID_ACCESS_TOKEN: ${{ secrets.PLAID_ACCESS_TOKEN }}
+          NOTIFY_CHANNEL: ${{ secrets.NOTIFY_CHANNEL }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           SMS_GATEWAYS: ${{ secrets.SMS_GATEWAYS }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
+          SMS_RECIPIENTS: ${{ secrets.SMS_RECIPIENTS }}
           MONTHLY_BUDGET: ${{ secrets.MONTHLY_BUDGET }}
           TIMEZONE: ${{ secrets.TIMEZONE }}
           DELIVERY_HOUR: ${{ secrets.DELIVERY_HOUR }}
