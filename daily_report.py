@@ -53,26 +53,27 @@ def _spend(transactions) -> float:
 
 
 def _txn_date(t):
-    """The date we bucket a transaction under. Prefer `authorized_date` (the
-    purchase date, stable across pending->posted) when the bank provides it;
-    Bank of America does not, so this falls back to `date` (the posted date)."""
+    """The real purchase date we bucket a transaction under. BoA leaves
+    `authorized_date` null but populates `authorized_datetime` with the actual
+    purchase moment, which stays fixed as the transaction moves pending ->
+    posted (so a charge never lands on two different days). Fall back to
+    `authorized_date`, then the posted `date`, if the datetime is missing."""
+    adt = getattr(t, "authorized_datetime", None)
+    if adt is not None:
+        if adt.tzinfo is not None:
+            adt = adt.astimezone(ZoneInfo(config.TIMEZONE))
+        return adt.date()
     return getattr(t, "authorized_date", None) or t.date
-
-
-def _posted(transactions):
-    """Only settled transactions. Pending ones are excluded because their date
-    shifts when they post, which would show the same purchase on two different
-    days and double-count the monthly total."""
-    return [t for t in transactions if not t.pending]
 
 
 def build_report(transactions, today: date) -> str:
     first_of_month = today.replace(day=1)
     yesterday = today - timedelta(days=1)
 
-    posted = _posted(transactions)
-    yday_txns = [t for t in posted if _txn_date(t) == yesterday]
-    mtd_txns = [t for t in posted if first_of_month <= _txn_date(t) <= today]
+    # Bucket by purchase date, including pending (their purchase date is fixed,
+    # so no charge is counted twice).
+    yday_txns = [t for t in transactions if _txn_date(t) == yesterday]
+    mtd_txns = [t for t in transactions if first_of_month <= _txn_date(t) <= today]
 
     yday_spend = _spend(yday_txns)
     mtd_spend = _spend(mtd_txns)
