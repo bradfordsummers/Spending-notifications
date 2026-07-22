@@ -52,12 +52,27 @@ def _spend(transactions) -> float:
     return sum(float(t.amount) for t in transactions if float(t.amount) > 0)
 
 
+def _txn_date(t):
+    """The date we bucket a transaction under. Prefer `authorized_date` (the
+    purchase date, stable across pending->posted) when the bank provides it;
+    Bank of America does not, so this falls back to `date` (the posted date)."""
+    return getattr(t, "authorized_date", None) or t.date
+
+
+def _posted(transactions):
+    """Only settled transactions. Pending ones are excluded because their date
+    shifts when they post, which would show the same purchase on two different
+    days and double-count the monthly total."""
+    return [t for t in transactions if not t.pending]
+
+
 def build_report(transactions, today: date) -> str:
     first_of_month = today.replace(day=1)
     yesterday = today - timedelta(days=1)
 
-    yday_txns = [t for t in transactions if t.date == yesterday]
-    mtd_txns = [t for t in transactions if first_of_month <= t.date <= today]
+    posted = _posted(transactions)
+    yday_txns = [t for t in posted if _txn_date(t) == yesterday]
+    mtd_txns = [t for t in posted if first_of_month <= _txn_date(t) <= today]
 
     yday_spend = _spend(yday_txns)
     mtd_spend = _spend(mtd_txns)
