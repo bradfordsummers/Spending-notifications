@@ -76,18 +76,16 @@ def build_report(transactions, today: date) -> str:
 
     lines = [f"Yesterday: ${yday_spend:,.2f}"]
 
-    # Up to 5 biggest purchases from yesterday, largest first.
+    # Every purchase from yesterday, largest first.
     purchases = sorted(
         (t for t in yday_txns if float(t.amount) > 0),
         key=lambda t: float(t.amount),
         reverse=True,
     )
     if purchases:
-        for t in purchases[:5]:
+        for t in purchases:
             name = (t.merchant_name or t.name or "Unknown")[:24]
             lines.append(f"  - {name} ${float(t.amount):,.2f}")
-        if len(purchases) > 5:
-            lines.append(f"  - +{len(purchases) - 5} more")
     else:
         lines.append("  - No purchases")
 
