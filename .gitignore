@@ -2,6 +2,9 @@
 .env
 *.token
 
+# Per-day "already sent" marker (created at runtime; cached in CI)
+.sent-marker
+
 # Python
 __pycache__/
 *.py[cod]

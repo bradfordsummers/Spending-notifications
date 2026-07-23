@@ -117,14 +117,35 @@ def build_report(transactions, today: date) -> str:
     return subject, "\n".join(lines)
 
 
-def main():
-    today = _today_local()
-    now_local = datetime.now(ZoneInfo(config.TIMEZONE))
+def _mark_sent(today: date) -> None:
+    """Record that today's report went out, so the workflow's backstop runs
+    skip. No-op unless SENT_MARKER_FILE is set (i.e. only in the cloud)."""
+    if not config.SENT_MARKER_FILE:
+        return
+    try:
+        with open(config.SENT_MARKER_FILE, "w") as f:
+            f.write(str(today))
+    except OSError as e:  # pragma: no cover - best effort
+        print(f"  (could not write sent-marker {config.SENT_MARKER_FILE}: {e})")
 
-    if not config.FORCE_SEND and now_local.hour != config.DELIVERY_HOUR:
+
+def main():
+    now_local = datetime.now(ZoneInfo(config.TIMEZONE))
+    today = now_local.date()
+
+    # Send on ANY run at or after the delivery hour, within a morning window --
+    # not only when the hour matches exactly. GitHub Actions fires cron jobs
+    # late, so an 8 AM job may not run until 9 or 10; ">=" lets that late run
+    # still send. The workflow's once-per-day cache guard stops the backstop
+    # runs from sending a duplicate.
+    window_end = config.DELIVERY_HOUR + config.DELIVERY_WINDOW_HOURS
+    if not config.FORCE_SEND and not (
+        config.DELIVERY_HOUR <= now_local.hour < window_end
+    ):
         print(
-            f"Local time is {now_local:%H:%M} {config.TIMEZONE}; delivery hour is "
-            f"{config.DELIVERY_HOUR:02d}:00. Skipping (set FORCE_SEND=1 to override)."
+            f"Local time is {now_local:%H:%M} {config.TIMEZONE}; outside the "
+            f"{config.DELIVERY_HOUR:02d}:00-{window_end:02d}:00 send window. "
+            f"Skipping (set FORCE_SEND=1 to override)."
         )
         return
 
@@ -142,6 +163,10 @@ def main():
     if config.SMS_GATEWAYS:
         send_sms(body, subject)
         print(f"Sent to {len(config.SMS_GATEWAYS)} recipient(s).")
+        # Mark the day done so the backstop runs skip. Skip this for manual
+        # FORCE_SEND tests, so a test run never suppresses the morning send.
+        if not config.FORCE_SEND:
+            _mark_sent(today)
     else:
         print("No SMS_GATEWAYS set - printed only, nothing sent.")
 

@@ -63,11 +63,20 @@ SMS_RECIPIENTS = [
 # --- Budget & schedule ---
 MONTHLY_BUDGET = float(os.environ.get("MONTHLY_BUDGET", "9000"))
 TIMEZONE = os.environ.get("TIMEZONE", "America/Los_Angeles")
-# The local hour the report should go out. The workflow fires around this time
-# in UTC; daily_report.py double-checks the local hour so DST never shifts it.
+# The local hour the report should go out. The workflow fires a few times
+# around this time in UTC; daily_report.py checks the local hour so DST never
+# shifts it and a late run still counts.
 DELIVERY_HOUR = int(os.environ.get("DELIVERY_HOUR", "8"))
-# If "1", skip the delivery-hour guard (used for manual test runs).
+# How many hours past DELIVERY_HOUR we'll still send. GitHub Actions fires cron
+# jobs late (often 30-90 min), so we accept any morning run in the window
+# [DELIVERY_HOUR, DELIVERY_HOUR + WINDOW). Default 4 => 08:00-11:59 local.
+DELIVERY_WINDOW_HOURS = int(os.environ.get("DELIVERY_WINDOW_HOURS", "4"))
+# If "1", skip the delivery-window guard (used for manual test runs).
 FORCE_SEND = os.environ.get("FORCE_SEND", "0") == "1"
+# When set, a successful scheduled send writes this file. The workflow caches
+# it per day so the backstop runs know the report already went out and don't
+# send a duplicate. Empty for local runs (no dedupe needed).
+SENT_MARKER_FILE = os.environ.get("SENT_MARKER_FILE", "")
 
 
 def require_plaid():

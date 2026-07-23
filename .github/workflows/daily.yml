@@ -1,18 +1,28 @@
 name: Daily spending report
 
 on:
-  # GitHub cron is in UTC and does NOT adjust for daylight saving time.
-  # 8:00 AM Pacific is 15:00 UTC (summer, PDT) or 16:00 UTC (winter, PST).
-  # We fire at BOTH; daily_report.py checks the local hour and only sends
-  # when it's actually 8 AM in America/Los_Angeles, so you get exactly one.
+  # GitHub cron is in UTC and does NOT adjust for daylight saving time, AND it
+  # runs jobs late (often 30-90 min) or drops them entirely when the top of the
+  # hour is busy. So we fire several times off the hour across the morning and
+  # let daily_report.py + a once-per-day cache guard sort out a single send:
+  #   - It only sends within the local morning window (08:00-11:59 by default),
+  #     so DST and early UTC slots are handled automatically.
+  #   - The first run that actually sends writes a cached marker; later
+  #     "backstop" runs see it and skip, so you get exactly one text.
+  # 8:20 AM Pacific is 15:20 UTC (summer, PDT) / 16:20 UTC (winter, PST); the
+  # :50 and later-hour entries are backstops in case an earlier slot is dropped.
   schedule:
-    - cron: "0 15 * * *"
-    - cron: "0 16 * * *"
-  # Lets you run it by hand from the Actions tab (sends immediately).
+    - cron: "20 15 * * *"   # 08:20 PDT / 07:20 PST
+    - cron: "50 15 * * *"   # 08:50 PDT / 07:50 PST
+    - cron: "20 16 * * *"   # 09:20 PDT / 08:20 PST
+    - cron: "50 16 * * *"   # 09:50 PDT / 08:50 PST
+    - cron: "20 17 * * *"   # 10:20 PDT / 09:20 PST
+  # Lets you run it by hand from the Actions tab (sends immediately, and does
+  # not touch the daily dedupe marker so it won't suppress the morning send).
   workflow_dispatch:
     inputs:
       force_send:
-        description: "Send now, ignoring the 8 AM check"
+        description: "Send now, ignoring the send-window check"
         type: boolean
         default: true
 
@@ -26,10 +36,27 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Compute today's Pacific date
+        id: date
+        run: echo "today=$(TZ='America/Los_Angeles' date +%F)" >> "$GITHUB_OUTPUT"
+
+      # Restore the per-day marker. A cache hit means today's report already
+      # went out, so the send step below is skipped. On a miss the send step
+      # runs, and (if it sends) writes .sent-marker, which this action saves at
+      # the end of the job under today's key for the later backstop runs.
+      - name: Check if already sent today
+        id: sent
+        uses: actions/cache@v4
+        with:
+          path: .sent-marker
+          key: spending-report-sent-${{ steps.date.outputs.today }}
+
       - name: Install dependencies
+        if: github.event_name == 'workflow_dispatch' || steps.sent.outputs.cache-hit != 'true'
         run: pip install -r requirements.txt
 
       - name: Send daily report
+        if: github.event_name == 'workflow_dispatch' || steps.sent.outputs.cache-hit != 'true'
         env:
           PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
           PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
@@ -46,5 +73,8 @@ jobs:
           MONTHLY_BUDGET: ${{ secrets.MONTHLY_BUDGET }}
           TIMEZONE: ${{ secrets.TIMEZONE }}
           DELIVERY_HOUR: ${{ secrets.DELIVERY_HOUR }}
+          # Scheduled runs write this marker on a successful send so the
+          # backstop runs skip. Manual runs force-send and skip the marker.
+          SENT_MARKER_FILE: .sent-marker
           FORCE_SEND: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
         run: python daily_report.py
