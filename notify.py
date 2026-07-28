@@ -81,8 +81,15 @@ def _send_email_gateway(body: str, subject: str) -> None:
         if not _with_retry(to_addr, attempt):
             failures += 1
 
+    total = len(config.SMS_GATEWAYS)
+    # Only fail the run if EVERY recipient failed -- then nothing was delivered,
+    # so the cloud job should error and let a backstop run retry. If at least
+    # one recipient got it, succeed so the day is marked done and the working
+    # recipients aren't re-texted by later runs.
+    if failures == total:
+        raise SystemExit(f"All {total} send(s) failed.")
     if failures:
-        raise SystemExit(f"{failures} of {len(config.SMS_GATEWAYS)} sends failed.")
+        print(f"  ({failures} of {total} failed; {total - failures} delivered)")
 
 
 # --- Channel: Twilio ------------------------------------------------------
@@ -121,5 +128,9 @@ def _send_twilio(body: str, subject: str) -> None:
         if not _with_retry(to_number, attempt):
             failures += 1
 
+    total = len(config.SMS_RECIPIENTS)
+    # Only fail the run if EVERY recipient failed (see email channel note).
+    if failures == total:
+        raise SystemExit(f"All {total} send(s) failed.")
     if failures:
-        raise SystemExit(f"{failures} of {len(config.SMS_RECIPIENTS)} sends failed.")
+        print(f"  ({failures} of {total} failed; {total - failures} delivered)")
