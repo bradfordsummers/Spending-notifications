@@ -77,6 +77,10 @@ FORCE_SEND = os.environ.get("FORCE_SEND", "0") == "1"
 # it per day so the backstop runs know the report already went out and don't
 # send a duplicate. Empty for local runs (no dedupe needed).
 SENT_MARKER_FILE = os.environ.get("SENT_MARKER_FILE", "")
+# JSON file of already-reported transaction keys, so each morning lists only
+# charges that are new since the last report. Persisted across days via the
+# GitHub Actions cache. Defaults to a local file so local runs also remember.
+SEEN_STATE_FILE = os.environ.get("SEEN_STATE_FILE", ".seen.json")
 
 
 def require_plaid():
