@@ -51,19 +51,6 @@ jobs:
           path: .sent-marker
           key: spending-report-sent-${{ steps.date.outputs.today }}
 
-      # Rolling state of already-reported charges so the report lists only what's
-      # new. A unique per-day key means this run saves today's copy at job end;
-      # restore-keys pulls forward the most recent previous copy on a miss.
-      # Skipped on manual dispatch so a force-send test can't poison the key.
-      - name: Restore reported-charges state
-        if: github.event_name != 'workflow_dispatch'
-        uses: actions/cache@v4
-        with:
-          path: .seen.json
-          key: spending-seen-${{ steps.date.outputs.today }}
-          restore-keys: |
-            spending-seen-
-
       - name: Install dependencies
         if: github.event_name == 'workflow_dispatch' || steps.sent.outputs.cache-hit != 'true'
         run: pip install -r requirements.txt
@@ -89,6 +76,5 @@ jobs:
           # Scheduled runs write this marker on a successful send so the
           # backstop runs skip. Manual runs force-send and skip the marker.
           SENT_MARKER_FILE: .sent-marker
-          SEEN_STATE_FILE: .seen.json
           FORCE_SEND: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
         run: python daily_report.py
