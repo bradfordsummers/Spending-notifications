@@ -5,9 +5,6 @@
 # Per-day "already sent" marker (created at runtime; cached in CI)
 .sent-marker
 
-# Already-reported transaction keys (created at runtime; cached in CI)
-.seen.json
-
 # Python
 __pycache__/
 *.py[cod]

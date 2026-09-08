@@ -1,5 +1,4 @@
 plaid-python>=18.0.0
-twilio>=9.0.0          # only used when NOTIFY_CHANNEL=twilio
 python-dotenv>=1.0.0
 tzdata>=2024.1
 flask>=3.0.0          # only used by link_card.py (the one-time setup step)

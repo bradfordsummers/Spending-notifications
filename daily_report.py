@@ -17,10 +17,6 @@ from plaid_client import make_client
 from notify import send_sms
 
 
-def _today_local() -> date:
-    return datetime.now(ZoneInfo(config.TIMEZONE)).date()
-
-
 def fetch_transactions(client, start: date, end: date):
     """Return all transactions for the card between start and end (inclusive)."""
     if not config.PLAID_ACCESS_TOKEN:
@@ -147,13 +143,12 @@ def main():
     print(body)
     print("-" * 40)
 
-    recipients = config.SMS_GATEWAYS or config.SMS_RECIPIENTS
-    if not recipients:
-        print("No recipients configured - printed only, nothing sent.")
+    if not config.SMS_GATEWAYS:
+        print("No SMS_GATEWAYS set - printed only, nothing sent.")
         return
 
     send_sms(body, subject)
-    print(f"Sent to {len(recipients)} recipient(s).")
+    print(f"Sent to {len(config.SMS_GATEWAYS)} recipient(s).")
 
     # Mark the day done so the backstop runs skip. Skip for manual FORCE_SEND
     # tests so a test run never suppresses the morning send.
