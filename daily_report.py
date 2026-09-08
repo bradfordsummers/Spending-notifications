@@ -94,12 +94,12 @@ def build_report(transactions, today: date):
     # Budget progress leads (percentage first), then yesterday's spend, then the
     # month detail. No per-transaction list.
     lines = [f"{pct:.0f}% of ${budget:,.0f} budget"]
-    lines.append(f"Yesterday: ${yday_spend:,.2f}")
-    lines.append(f"This month: ${mtd_spend:,.0f} of ${budget:,.0f}")
     if remaining >= 0:
         lines.append(f"${remaining:,.0f} left, {days_left} days to go")
     else:
         lines.append(f"OVER by ${-remaining:,.0f}, {days_left} days to go")
+    lines.append(f"This month: ${mtd_spend:,.0f} of ${budget:,.0f}")
+    lines.append(f"Yesterday: ${yday_spend:,.2f}")
 
     return subject, "\n".join(lines)
 
