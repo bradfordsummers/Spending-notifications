@@ -91,25 +91,11 @@ def build_report(transactions, today: date):
     # title bar at the top of the text. Sent every morning, so no date needed.
     subject = "Spending"
 
-    lines = [f"Yesterday: ${yday_spend:,.2f}"]
-
-    # Every purchase from yesterday, largest first.
-    purchases = sorted(
-        (t for t in yday_txns if float(t.amount) > 0),
-        key=lambda t: float(t.amount),
-        reverse=True,
-    )
-    if purchases:
-        for t in purchases:
-            name = (t.merchant_name or t.name or "Unknown")[:24]
-            lines.append(f"  - {name} ${float(t.amount):,.2f}")
-    else:
-        lines.append("  - No purchases")
-
-    lines.append("")
-    lines.append(
-        f"This month: ${mtd_spend:,.0f} of ${budget:,.0f} ({pct:.0f}%)"
-    )
+    # Budget progress leads (percentage first), then yesterday's spend, then the
+    # month detail. No per-transaction list.
+    lines = [f"{pct:.0f}% of ${budget:,.0f} budget"]
+    lines.append(f"Yesterday: ${yday_spend:,.2f}")
+    lines.append(f"This month: ${mtd_spend:,.0f} of ${budget:,.0f}")
     if remaining >= 0:
         lines.append(f"${remaining:,.0f} left, {days_left} days to go")
     else:
