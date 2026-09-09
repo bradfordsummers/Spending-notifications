@@ -1,13 +1,13 @@
 # Spending Notifications
 
 Texts one daily summary of spending on the Bank of America Alaska Airlines card
-vs a **$9,000/month** budget. Live since 2026-07-22.
+vs a **$6,600/month** card budget. Live since 2026-07-22.
 
 ```
 Spending
-62% of $9,000 budget
-$3,420 left, 12 days to go
-This month: $5,580 of $9,000
+62% of $6,600 budget
+$2,508 left, 12 days to go
+This month: $4,092 of $6,600
 Yesterday: $247.83
 ```
 
@@ -48,6 +48,10 @@ skip. Fixes an earlier bug where exact-hour matching silently sent nothing.
 own schedule, so at 8 AM yesterday's charges may not have landed. Accepted
 tradeoff — the fix needs the paid `transactions_refresh` add-on (~$3-4/mo), which
 was considered and declined. MTD stays correct as data arrives.
+
+**Budget is $6,600, not $9,000.** The household budget is ~$9,000/mo, but the
+~$2,400 daycare charge hits a separate debit card this tool doesn't track, so the
+tracked credit-card goal is $6,600 (set via the `MONTHLY_BUDGET` secret).
 
 **Spend = positive amounts only.** Plaid reports refunds and card payments as
 negative; ignoring them keeps the total conservative.

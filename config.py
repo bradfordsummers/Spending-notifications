@@ -46,7 +46,9 @@ SMS_GATEWAYS = [
 ]
 
 # --- Budget & schedule ---
-MONTHLY_BUDGET = float(os.environ.get("MONTHLY_BUDGET", "9000"))
+# Credit-card budget = the household's ~$9,000/mo minus ~$2,400 daycare, which
+# hits a separate debit card this tool doesn't track. So the card goal is $6,600.
+MONTHLY_BUDGET = float(os.environ.get("MONTHLY_BUDGET", "6600"))
 TIMEZONE = os.environ.get("TIMEZONE", "America/Los_Angeles")
 # The local hour the report should go out. The workflow fires a few times
 # around this time in UTC; daily_report.py checks the local hour so DST never
