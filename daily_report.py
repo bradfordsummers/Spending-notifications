@@ -42,10 +42,27 @@ def fetch_transactions(client, start: date, end: date):
     return results
 
 
+# Plaid personal_finance_category.primary values that are money movement, not
+# spending: account transfers, app transfers (Venmo, etc.), and loan/card
+# payments. These can arrive as POSITIVE amounts (e.g. a $6,000 card payment) and
+# would otherwise inflate the total, so they're excluded from "spend".
+_NON_SPEND = {"TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"}
+
+
+def _is_purchase(t) -> bool:
+    """True for an actual purchase: a positive amount that isn't a transfer or
+    payment. Refunds and payments come through negative and are excluded by the
+    sign; positive-amount transfers/payments are excluded by category."""
+    if float(t.amount) <= 0:
+        return False
+    pfc = getattr(t, "personal_finance_category", None)
+    primary = getattr(pfc, "primary", None) if pfc else None
+    return primary not in _NON_SPEND
+
+
 def _spend(transactions) -> float:
-    """Sum of purchases. Plaid marks money-out as positive; card payments and
-    refunds come through negative, so summing positives gives gross spend."""
-    return sum(float(t.amount) for t in transactions if float(t.amount) > 0)
+    """Sum of actual purchases (excludes transfers and payments)."""
+    return sum(float(t.amount) for t in transactions if _is_purchase(t))
 
 
 def _txn_date(t):
@@ -87,14 +104,16 @@ def build_report(transactions, today: date):
     # title bar at the top of the text. Sent every morning, so no date needed.
     subject = "Spending"
 
-    # Budget progress leads (percentage first), then yesterday's spend, then the
-    # month detail. No per-transaction list.
-    lines = [f"{pct:.0f}% of ${budget:,.0f} budget"]
+    # Blank first line so there's a break under the "Spending" title, then one
+    # fact per line: money left, days to go, % of budget, month total, yesterday.
+    lines = [""]
     if remaining >= 0:
-        lines.append(f"${remaining:,.0f} left, {days_left} days to go")
+        lines.append(f"${remaining:,.0f} left")
     else:
-        lines.append(f"OVER by ${-remaining:,.0f}, {days_left} days to go")
-    lines.append(f"This month: ${mtd_spend:,.0f} of ${budget:,.0f}")
+        lines.append(f"${-remaining:,.0f} over budget")
+    lines.append(f"{days_left} days to go")
+    lines.append(f"{pct:.0f}% of ${budget:,.0f} budget")
+    lines.append(f"This month: ${mtd_spend:,.0f}")
     lines.append(f"Yesterday: ${yday_spend:,.2f}")
 
     return subject, "\n".join(lines)
