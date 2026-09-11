@@ -53,8 +53,10 @@ was considered and declined. MTD stays correct as data arrives.
 ~$2,400 daycare charge hits a separate debit card this tool doesn't track, so the
 tracked credit-card goal is $6,600 (set via the `MONTHLY_BUDGET` secret).
 
-**Spend = positive amounts only.** Plaid reports refunds and card payments as
-negative; ignoring them keeps the total conservative.
+**Spend excludes transfers and payments.** Counts positive amounts, but skips
+Plaid categories `TRANSFER_IN` / `TRANSFER_OUT` / `LOAN_PAYMENTS`. A $6,000 card
+payment once posted as a *positive* `TRANSFER_OUT` and was wrongly counted as
+spending (falsely "over budget"), so category — not just sign — is filtered.
 
 **ASCII only in the message.** Keeps SMS in GSM-7 (160 chars/segment vs 70 for
 Unicode).
