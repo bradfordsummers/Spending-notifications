@@ -54,10 +54,12 @@ TIMEZONE = os.environ.get("TIMEZONE", "America/Los_Angeles")
 # around this time in UTC; daily_report.py checks the local hour so DST never
 # shifts it and a late run still counts.
 DELIVERY_HOUR = int(os.environ.get("DELIVERY_HOUR", "8"))
-# How many hours past DELIVERY_HOUR we'll still send. GitHub Actions fires cron
-# jobs late (often 30-90 min), so we accept any morning run in the window
-# [DELIVERY_HOUR, DELIVERY_HOUR + WINDOW). Default 4 => 08:00-11:59 local.
-DELIVERY_WINDOW_HOURS = int(os.environ.get("DELIVERY_WINDOW_HOURS", "4"))
+# How many hours past DELIVERY_HOUR we'll still send. GitHub frequently runs
+# scheduled jobs HOURS late (observed 4-5h), which pushed every run past a narrow
+# window so nothing sent. A wide window means the first run to fire that day still
+# delivers (the per-day .sent-marker keeps it to one text). 14 => 08:00-21:59
+# local: sends in the morning when GitHub is on time, otherwise later that day.
+DELIVERY_WINDOW_HOURS = int(os.environ.get("DELIVERY_WINDOW_HOURS", "14"))
 # If "1", skip the delivery-window guard (used for manual test runs).
 FORCE_SEND = os.environ.get("FORCE_SEND", "0") == "1"
 # When set, a successful scheduled send writes this file. The workflow caches
