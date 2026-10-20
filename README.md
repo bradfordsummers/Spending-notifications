@@ -23,6 +23,7 @@ gateway (Gmail SMTP). No server, no database, no app.
 | `config.py` | Env vars (`.env` locally, repo Secrets in CI). |
 | `plaid_client.py` | Builds the Plaid API client. |
 | `link_card.py` | One-time card linking; prints `PLAID_ACCESS_TOKEN`. |
+| `relink.py` + `.github/workflows/relink.yml` | Fix `ITEM_LOGIN_REQUIRED`: Actions → "Repair bank connection" emails a reconnect link (Plaid update mode, same token, no secret changes). |
 | `.github/workflows/daily.yml` | Cloud scheduler. |
 | `docs/` | GitHub Pages (privacy/terms/opt-in). Vestigial — built for Twilio A2P vetting; keeps the repo public-safe. |
 

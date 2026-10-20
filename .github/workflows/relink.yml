@@ -1,0 +1,31 @@
+name: Repair bank connection
+
+# Run this when the daily job fails with ITEM_LOGIN_REQUIRED (bank password
+# change, MFA, or periodic re-consent). It emails a reconnect link to the
+# EMAIL_FROM inbox; open it and log into Bank of America. The existing
+# PLAID_ACCESS_TOKEN starts working again -- no secrets to update.
+on:
+  workflow_dispatch:
+
+jobs:
+  relink:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Email an update-mode reconnect link
+        env:
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+          PLAID_ENV: ${{ secrets.PLAID_ENV }}
+          PLAID_ACCESS_TOKEN: ${{ secrets.PLAID_ACCESS_TOKEN }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+        run: python relink.py

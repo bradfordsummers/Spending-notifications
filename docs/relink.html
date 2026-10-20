@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reconnect your card</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 60px auto; padding: 0 16px; text-align: center; }
+    button { font-size: 18px; padding: 12px 24px; cursor: pointer; }
+    #status { color: #666; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <h2>Spending Notifications &mdash; reconnect your card</h2>
+  <p>Bank of America asked you to log in again. Click below, log in, and you're done.</p>
+  <button id="btn">Reconnect Bank of America</button>
+  <p id="status"></p>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <script>
+    // relink.py emails this page with the update-mode link token in the
+    // #fragment (never sent to the server). Read it, then clear the address bar.
+    const token = new URLSearchParams(location.hash.slice(1)).get('token');
+    history.replaceState(null, '', location.pathname);
+    const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
+    if (!token) {
+      btn.disabled = true;
+      status.textContent = 'This link is missing its token. Run "Repair bank connection" again from the Actions tab.';
+    }
+    btn.addEventListener('click', () => {
+      Plaid.create({
+        token,
+        onSuccess: () => {
+          btn.disabled = true;
+          status.innerHTML = '&#9989; Reconnected! You can close this tab.';
+        },
+        onExit: (err) => {
+          if (err) status.textContent = 'Exited: ' + (err.display_message || err.error_message || err.error_code);
+        },
+      }).open();
+    });
+  </script>
+</body>
+</html>
