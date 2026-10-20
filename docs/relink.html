@@ -35,7 +35,8 @@
           status.innerHTML = '&#9989; Reconnected! You can close this tab.';
         },
         onExit: (err) => {
-          if (err) status.textContent = 'Exited: ' + (err.display_message || err.error_message || err.error_code);
+          // Show the raw Plaid error code too, so a failure can be diagnosed.
+          if (err) status.textContent = 'Exited: ' + (err.display_message || err.error_message || '') + ' [' + err.error_code + ']';
         },
       }).open();
     });

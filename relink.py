@@ -22,34 +22,24 @@ from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUse
 import config
 from plaid_client import make_client
 
-# Fallback when Plaid Hosted Link isn't enabled on the account: a static page
-# (docs/relink.html on GitHub Pages) that opens Link with the token. The token
-# rides in the #fragment, which browsers never send to the server.
+# A static page (docs/relink.html on GitHub Pages) that opens the same Plaid
+# Link widget link_card.py uses. The token rides in the #fragment, which
+# browsers never send to the server. (Plaid Hosted Link was tried first and
+# failed with "Internal error occurred" on this account.)
 PAGES_URL = "https://bradfordsummers.github.io/Spending-notifications/relink.html"
 
 
 def _create_link(client):
-    """Return (link_token, url) for an update-mode Link session. Prefers a
-    Plaid-hosted URL (works on any device); falls back to the Pages page."""
-    base = dict(
-        user=LinkTokenCreateRequestUser(client_user_id="household"),
-        client_name="Spending Notifications",
-        country_codes=[CountryCode("US")],
-        language="en",
-        access_token=config.PLAID_ACCESS_TOKEN,  # this is what makes it update mode
-    )
-    try:
-        from plaid.model.link_token_create_hosted_link import LinkTokenCreateHostedLink
-
-        resp = client.link_token_create(
-            LinkTokenCreateRequest(hosted_link=LinkTokenCreateHostedLink(), **base)
+    """Return (link_token, url) for an update-mode Link session."""
+    resp = client.link_token_create(
+        LinkTokenCreateRequest(
+            user=LinkTokenCreateRequestUser(client_user_id="household"),
+            client_name="Spending Notifications",
+            country_codes=[CountryCode("US")],
+            language="en",
+            access_token=config.PLAID_ACCESS_TOKEN,  # this is what makes it update mode
         )
-        if getattr(resp, "hosted_link_url", None):
-            return resp.link_token, resp.hosted_link_url
-    except Exception as e:  # noqa: BLE001 - not enabled / older SDK: use fallback
-        print(f"Hosted Link unavailable ({getattr(e, 'body', e)}); using the Pages page.")
-
-    resp = client.link_token_create(LinkTokenCreateRequest(**base))
+    )
     return resp.link_token, f"{PAGES_URL}#token={resp.link_token}"
 
 
