@@ -54,10 +54,17 @@ was considered and declined. MTD stays correct as data arrives.
 ~$2,400 daycare charge hits a separate debit card this tool doesn't track, so the
 tracked credit-card goal is $6,600 (set via the `MONTHLY_BUDGET` secret).
 
-**Spend excludes transfers and payments.** Counts positive amounts, but skips
-Plaid categories `TRANSFER_IN` / `TRANSFER_OUT` / `LOAN_PAYMENTS`. A $6,000 card
-payment once posted as a *positive* `TRANSFER_OUT` and was wrongly counted as
-spending (falsely "over budget"), so category — not just sign — is filtered.
+**Spend excludes transfers and card payments; counts Venmo and BNPL.** Counts
+positive amounts, skipping `TRANSFER_IN` / `TRANSFER_OUT` / `LOAN_PAYMENTS` (a $6,000
+card payment once posted as a *positive* transfer and was counted as spending),
+except Venmo-style app payments (`TRANSFER_OUT_TRANSFER_OUT_FROM_APPS`) and
+Afterpay/Klarna (`LOAN_PAYMENTS_BNPL`), which pay for real purchases and do count.
+
+**Month = purchase date, not posted date.** A charge counts on the day it was
+bought (`authorized_datetime`/`authorized_date`). So totals differ from the BoA
+statement at month edges (e.g. a Sept 29 purchase posting Oct 2 counts in Sept).
+Reconciled against a BoA CSV export 2026-10-21: matches to the penny once those
+two effects and pending charges are accounted for. Same rule for the 1st/16th reports.
 
 **ASCII only in the message.** Keeps SMS in GSM-7 (160 chars/segment vs 70 for
 Unicode).

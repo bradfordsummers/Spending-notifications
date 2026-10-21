@@ -42,22 +42,24 @@ def fetch_transactions(client, start: date, end: date):
     return results
 
 
-# Plaid personal_finance_category.primary values that are money movement, not
-# spending: account transfers, app transfers (Venmo, etc.), and loan/card
-# payments. These can arrive as POSITIVE amounts (e.g. a $6,000 card payment) and
-# would otherwise inflate the total, so they're excluded from "spend".
+# Plaid categories that are money movement, not spending: account transfers and
+# credit-card payments. These can arrive as POSITIVE amounts (e.g. a $6,000 card
+# payment once did) and would otherwise inflate the total, so they're excluded.
 _NON_SPEND = {"TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"}
+# ...except these, which pay for real purchases and DO count as spending:
+# Venmo/app payments and buy-now-pay-later installments (Afterpay, Klarna).
+_COUNTS_AS_SPEND = {"TRANSFER_OUT_TRANSFER_OUT_FROM_APPS", "LOAN_PAYMENTS_BNPL"}
 
 
 def _is_purchase(t) -> bool:
-    """True for an actual purchase: a positive amount that isn't a transfer or
-    payment. Refunds and payments come through negative and are excluded by the
-    sign; positive-amount transfers/payments are excluded by category."""
+    """True for spending: a positive amount that isn't a transfer or card
+    payment. Refunds come through negative and are excluded by the sign."""
     if float(t.amount) <= 0:
         return False
     pfc = getattr(t, "personal_finance_category", None)
-    primary = getattr(pfc, "primary", None) if pfc else None
-    return primary not in _NON_SPEND
+    if not pfc:
+        return True
+    return pfc.primary not in _NON_SPEND or pfc.detailed in _COUNTS_AS_SPEND
 
 
 def _spend(transactions) -> float:
