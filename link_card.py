@@ -1,16 +1,20 @@
-"""One-time setup: connect your Bank of America Alaska Airlines card via Plaid.
+"""Connect a bank to this app via Plaid and save its token into .env.
 
-Run this ONCE on your own computer:
+Run on your own computer, once per bank:
 
-    python link_card.py
+    python link_card.py              # Bank of America card -> PLAID_ACCESS_TOKEN
+    python link_card.py becu         # -> PLAID_TOKEN_BECU
+    python link_card.py wellsfargo   # -> PLAID_TOKEN_WELLSFARGO
 
-It opens a small local web page. Click the button, log into Bank of America,
-and pick the card. When it finishes, this script prints your PLAID_ACCESS_TOKEN.
-Copy that token into your .env file and into GitHub repo Secrets. You never need
-to run this again unless the connection breaks.
+It opens a local page; log into the bank and pick the accounts. The token is
+written straight into .env (no copy-paste). Push it to the cloud afterwards with
+`gh secret set -f .env`. Re-run the same command if a connection ever breaks.
 """
+import os
+import sys
 import webbrowser
 
+from dotenv import set_key
 from flask import Flask, jsonify, request
 
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
@@ -24,46 +28,43 @@ from plaid.model.item_public_token_exchange_request import (
 import config
 from plaid_client import make_client
 
+NAME = (sys.argv[1] if len(sys.argv) > 1 else "boa").lower()
+ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+ENV_KEY = "PLAID_ACCESS_TOKEN" if NAME == "boa" else f"PLAID_TOKEN_{NAME.upper()}"
+
 app = Flask(__name__)
 client = make_client()
 
-PAGE = """
+PAGE = f"""
 <!doctype html>
 <html>
-<head><title>Connect your card</title></head>
+<head><title>Connect {NAME}</title></head>
 <body style="font-family: system-ui; max-width: 640px; margin: 60px auto; text-align:center;">
-  <h2>Spending Notifications &mdash; connect your card</h2>
-  <p>Click below and log into Bank of America to link the Alaska Airlines card.</p>
-  <button id="btn" style="font-size:18px; padding:12px 24px; cursor:pointer;">
-    Connect Bank of America
-  </button>
+  <h2>Spending Notifications &mdash; connect {NAME}</h2>
+  <p>Click below, pick your bank, log in, and select the accounts to include.</p>
+  <button id="btn" style="font-size:18px; padding:12px 24px; cursor:pointer;">Connect</button>
   <p id="status" style="color:#666; margin-top:24px;"></p>
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <script>
-    async function start() {
-      const r = await fetch('/link-token');
-      const { link_token } = await r.json();
-      const handler = Plaid.create({
+    async function start() {{
+      const {{ link_token }} = await (await fetch('/link-token')).json();
+      Plaid.create({{
         token: link_token,
-        onSuccess: async (public_token) => {
+        onSuccess: async (public_token) => {{
           document.getElementById('status').innerText = 'Finishing up...';
-          const resp = await fetch('/exchange', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ public_token })
-          });
-          const data = await resp.json();
-          document.getElementById('status').innerHTML =
-            data.ok
-              ? '&#9989; Done! Return to your terminal to copy the access token, then close this tab.'
-              : ('Something went wrong: ' + (data.error || 'unknown'));
-        },
-        onExit: (err) => {
+          const data = await (await fetch('/exchange', {{
+            method: 'POST', headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{ public_token }})
+          }})).json();
+          document.getElementById('status').innerHTML = data.ok
+            ? '&#9989; Done! Saved to .env as {ENV_KEY}. You can close this tab.'
+            : ('Something went wrong: ' + (data.error || 'unknown'));
+        }},
+        onExit: (err) => {{
           if (err) document.getElementById('status').innerText = 'Exited: ' + JSON.stringify(err);
-        }
-      });
-      handler.open();
-    }
+        }}
+      }}).open();
+    }}
     document.getElementById('btn').addEventListener('click', start);
   </script>
 </body>
@@ -85,8 +86,7 @@ def link_token():
         country_codes=[CountryCode("US")],
         language="en",
     )
-    resp = client.link_token_create(req)
-    return jsonify({"link_token": resp.link_token})
+    return jsonify({"link_token": client.link_token_create(req).link_token})
 
 
 @app.route("/exchange", methods=["POST"])
@@ -99,24 +99,15 @@ def exchange():
     except Exception as e:  # noqa: BLE001 - surface any Plaid error to the page
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    access_token = resp.access_token
-    print("\n" + "=" * 70)
-    print("SUCCESS. Your PLAID_ACCESS_TOKEN is:\n")
-    print("   " + access_token)
-    print("\nAdd it to your .env file and to GitHub repo Secrets as")
-    print("PLAID_ACCESS_TOKEN, then stop this script (Ctrl+C).")
-    print("=" * 70 + "\n")
+    set_key(ENV_FILE, ENV_KEY, resp.access_token, quote_mode="never")
+    print(f"\nSUCCESS: saved {ENV_KEY} to .env. Press Ctrl+C to stop this script.\n", flush=True)
     return jsonify({"ok": True})
 
 
 if __name__ == "__main__":
     if config.PLAID_ENV == "sandbox":
-        print(
-            "\nNOTE: PLAID_ENV=sandbox — you'll log in with Plaid's fake test "
-            "credentials (user_good / pass_good), not real Bank of America.\n"
-            "Set PLAID_ENV=production in .env to link your real card.\n"
-        )
+        print("\nNOTE: PLAID_ENV=sandbox -- use Plaid's test login (user_good / pass_good).\n")
     url = "http://127.0.0.1:5000/"
-    print(f"Opening {url} — complete the flow in your browser.")
+    print(f"Connecting '{NAME}' -> {ENV_KEY}. Opening {url} ...", flush=True)
     webbrowser.open(url)
     app.run(port=5000)
