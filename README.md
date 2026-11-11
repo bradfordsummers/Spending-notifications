@@ -29,12 +29,17 @@ gateway (Gmail SMTP). No server, no database, no app.
 
 ## Design decisions worth knowing
 
-**Delivery is email-to-SMS.** Twilio was tried first and abandoned — A2P 10DLC
-registration kept getting rejected (errors 30034 → 30909 → 30886). The Twilio
-code path and its `NOTIFY_CHANNEL` switch were **removed** in favor of one
-straightforward path; resurrect from git history if A2P ever clears. Email-to-text
-via Gmail SMTP is free and works. T-Mobile (`@tmomail.net`) confirmed delivering;
-Xfinity/Verizon (`@vtext.com`) unconfirmed.
+**Delivery: email-to-SMS now, Twilio when A2P clears.** `DELIVERY_CHANNEL`
+picks the path (`email` default, or `twilio`). Email-to-text via Gmail SMTP is
+free but dying: Verizon `@vtext.com` started bouncing Nov 2026; T-Mobile
+`@tmomail.net` still delivers for now. Twilio A2P 10DLC was rejected several
+times (30034 → 30909 → 30886, then "appears to be P2P"). The last rejection was
+because the campaign and `docs/` pages described it as a personal two-person
+tool, which reads as person-to-person. Nov 2026: `docs/` rewritten as an
+automated alert program with a START-keyword opt-in, and the campaign
+resubmitted. To switch once approved, set secrets `DELIVERY_CHANNEL=twilio`,
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`, and
+`SMS_TO` (E.164, comma-separated). The Twilio path uses the stdlib, no SDK.
 
 **Send window, not exact hour.** GitHub cron fires 30–90 min late and sometimes
 drops runs. So: five cron slots across the morning, each run sends only if the

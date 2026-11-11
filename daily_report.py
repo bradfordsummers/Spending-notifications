@@ -14,7 +14,7 @@ from plaid.model.transactions_get_request_options import (
 
 import config
 from plaid_client import make_client
-from notify import send_sms
+from notify import recipients, send_sms
 
 
 def fetch_transactions(client, start: date, end: date):
@@ -164,12 +164,12 @@ def main():
     print(body)
     print("-" * 40)
 
-    if not config.SMS_GATEWAYS:
-        print("No SMS_GATEWAYS set - printed only, nothing sent.")
+    if not recipients():
+        print(f"No recipients set for channel '{config.DELIVERY_CHANNEL}' - printed only, nothing sent.")
         return
 
     send_sms(body, subject)
-    print(f"Sent to {len(config.SMS_GATEWAYS)} recipient(s).")
+    print(f"Sent to {len(recipients())} recipient(s) via {config.DELIVERY_CHANNEL}.")
 
     # Mark the day done so the backstop runs skip. Skip for manual FORCE_SEND
     # tests so a test run never suppresses the morning send.

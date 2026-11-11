@@ -45,6 +45,18 @@ SMS_GATEWAYS = [
     a.strip() for a in os.environ.get("SMS_GATEWAYS", "").split(",") if a.strip()
 ]
 
+# --- Delivery channel ---
+# "email" (carrier gateways above) or "twilio" (needs an approved A2P campaign).
+DELIVERY_CHANNEL = (os.environ.get("DELIVERY_CHANNEL") or "email").strip().lower()
+
+# --- Delivery: Twilio ---
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+# The Messaging Service tied to the A2P campaign (starts with MG).
+TWILIO_MESSAGING_SERVICE_SID = os.environ.get("TWILIO_MESSAGING_SERVICE_SID", "")
+# Comma-separated E.164 numbers, e.g. +15551234567,+15557654321
+SMS_TO = [n.strip() for n in os.environ.get("SMS_TO", "").split(",") if n.strip()]
+
 # --- Budget & schedule ---
 # Credit-card budget = the household's ~$9,000/mo minus ~$2,400 daycare, which
 # hits a separate debit card this tool doesn't track. So the card goal is $6,600.

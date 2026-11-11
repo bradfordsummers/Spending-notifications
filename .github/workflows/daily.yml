@@ -65,6 +65,11 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           SMS_GATEWAYS: ${{ secrets.SMS_GATEWAYS }}
+          DELIVERY_CHANNEL: ${{ secrets.DELIVERY_CHANNEL }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_MESSAGING_SERVICE_SID: ${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}
+          SMS_TO: ${{ secrets.SMS_TO }}
           MONTHLY_BUDGET: ${{ secrets.MONTHLY_BUDGET }}
           TIMEZONE: ${{ secrets.TIMEZONE }}
           DELIVERY_HOUR: ${{ secrets.DELIVERY_HOUR }}
