@@ -100,8 +100,9 @@ def _check_twilio_config() -> None:
 
 def _send_twilio(to_number, subject, body) -> bool:
     """POST to Twilio's Messages API with the stdlib (no extra dependency).
-    The subject isn't a thing in SMS, so it's folded into the first line."""
-    text = f"{subject}\n{body}" if subject and not body.startswith(subject) else body
+    SMS has no subject, so the first line is the program name (matches the
+    sample messages registered with the A2P campaign)."""
+    text = f"{config.SMS_PROGRAM_NAME}\n{body.lstrip(chr(10))}"
     url = (
         f"https://api.twilio.com/2010-04-01/Accounts/"
         f"{config.TWILIO_ACCOUNT_SID}/Messages.json"

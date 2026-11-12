@@ -56,6 +56,8 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_MESSAGING_SERVICE_SID = os.environ.get("TWILIO_MESSAGING_SERVICE_SID", "")
 # Comma-separated E.164 numbers, e.g. +15551234567,+15557654321
 SMS_TO = [n.strip() for n in os.environ.get("SMS_TO", "").split(",") if n.strip()]
+# First line of every Twilio text. Keep it matching the A2P campaign samples.
+SMS_PROGRAM_NAME = "Spending Notifications"
 
 # --- Budget & schedule ---
 # Credit-card budget = the household's ~$9,000/mo minus ~$2,400 daycare, which
