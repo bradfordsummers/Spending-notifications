@@ -11,8 +11,7 @@ This month: $4,092 of $6,600
 Yesterday: $247.83
 ```
 
-**Stack:** Plaid (transactions) → GitHub Actions cron → carrier email-to-SMS
-gateway (Gmail SMTP). No server, no database, no app.
+**Stack:** Plaid (transactions) → GitHub Actions cron → Twilio SMS (A2P 10DLC). No server, no database, no app.
 
 ## Layout
 
@@ -25,21 +24,24 @@ gateway (Gmail SMTP). No server, no database, no app.
 | `link_card.py` | One-time card linking; prints `PLAID_ACCESS_TOKEN`. |
 | `relink.py` + `.github/workflows/relink.yml` | Fix `ITEM_LOGIN_REQUIRED`: Actions → "Repair bank connection" emails a reconnect link to `docs/relink.html` (Plaid update mode, same token, no secret changes). Hosted Link errors on this account — don't switch to it. |
 | `.github/workflows/daily.yml` | Cloud scheduler. |
-| `docs/` | GitHub Pages (privacy/terms/opt-in). Vestigial — built for Twilio A2P vetting; keeps the repo public-safe. |
+| `docs/` | GitHub Pages (privacy/terms/opt-in). The opt-in page and policies the A2P campaign points at — keep them live. |
 
 ## Design decisions worth knowing
 
-**Delivery: email-to-SMS now, Twilio when A2P clears.** `DELIVERY_CHANNEL`
-picks the path (`email` default, or `twilio`). Email-to-text via Gmail SMTP is
-free but dying: Verizon `@vtext.com` started bouncing Nov 2026; T-Mobile
-`@tmomail.net` still delivers for now. Twilio A2P 10DLC was rejected several
-times (30034 → 30909 → 30886, then "appears to be P2P"). The last rejection was
-because the campaign and `docs/` pages described it as a personal two-person
-tool, which reads as person-to-person. Nov 2026: `docs/` rewritten as an
-automated alert program with a START-keyword opt-in, and the campaign
-resubmitted. To switch once approved, set secrets `DELIVERY_CHANNEL=twilio`,
-`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`, and
-`SMS_TO` (E.164, comma-separated). The Twilio path uses the stdlib, no SDK.
+**Delivery: Twilio (A2P campaign approved Nov 2026), email-to-SMS fallback.**
+`DELIVERY_CHANNEL` picks the path (`twilio`, or `email` if the secret is unset).
+Twilio A2P 10DLC was rejected several times (30034 -> 30909 -> 30886, then
+"appears to be P2P") until `docs/` was rewritten as an automated alert program
+with a START-keyword opt-in; approved on resubmission. Twilio secrets:
+`DELIVERY_CHANNEL=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+`TWILIO_MESSAGING_SERVICE_SID` (the MG... service the campaign is attached to,
+with the 10DLC number in its sender pool), and `SMS_TO` (E.164, comma-separated).
+Each recipient should text START to the number once (the registered opt-in);
+anyone who replies STOP gets error 21610 until they text START again. The sender
+waits up to 60s for the carrier status, so a rejected text (e.g. 30034) fails
+the run and gets retried instead of being logged as "queued". Stdlib only, no
+SDK. Email-to-text via Gmail SMTP still works as a fallback (Verizon
+`@vtext.com` bounces since Nov 2026; T-Mobile `@tmomail.net` still delivers).
 
 **Send window, not exact hour.** GitHub cron fires 30–90 min late and sometimes
 drops runs. So: five cron slots across the morning, each run sends only if the
