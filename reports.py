@@ -207,26 +207,29 @@ def build_daily(transactions, today: date):
 # --- weekly (Mondays) -----------------------------------------------------
 
 def build_weekly(transactions, today: date):
-    """Last Mon-Sun: total, where the month stands now, top 5 purchases, and
-    top 5 vendors by number of purchases."""
+    """Last Mon-Sun: total (and its share of the monthly budget, so a heavy
+    week stands out), where the month stands now, top 10 purchases, and top 10
+    vendors by number of purchases."""
     start, end = last_week(today)
     week = purchases_between(transactions, start, end)
+    week_total = spend(week)
     first_of_month = today.replace(day=1)
     mtd = spend(t for t in transactions if first_of_month <= txn_date(t) <= today)
     budget = config.MONTHLY_BUDGET
     pct = (mtd / budget * 100) if budget else 0
+    week_pct = (week_total / budget * 100) if budget else 0
 
     lines = [
         "",
         "Weekly summary",
-        f"Last week ({_span(start, end)}): ${spend(week):,.0f}",
+        f"Last week ({_span(start, end)}): ${week_total:,.0f} ({week_pct:.0f}% of budget)",
         f"Month so far: {pct:.0f}% of ${budget:,.0f}",
         "",
-        "Top purchases:",
-        *_purchase_lines(top_purchases(week, 5)),
+        "Top 10 purchases:",
+        *_purchase_lines(top_purchases(week, 10)),
         "",
-        "Top vendors:",
-        *_vendor_lines(most_frequent(week, 5)),
+        "Top 10 vendors:",
+        *_vendor_lines(most_frequent(week, 10)),
     ]
     return "Weekly spending", "\n".join(lines)
 
