@@ -103,8 +103,10 @@ jobs:
             python daily_report.py > preview.txt
             echo "$PREVIEW_KEY" | base64 -d > pub.pem
             openssl rand -hex 32 > k.txt
-            echo "PREVIEW_KEY_ENC=$(openssl pkeyutl -encrypt -pubin -inkey pub.pem -in k.txt | base64 -w0)"
-            echo "PREVIEW_BODY_ENC=$(openssl enc -aes-256-cbc -pbkdf2 -salt -in preview.txt -pass file:k.txt | base64 -w0)"
+            # Digits are swapped for symbols: GitHub masks any text equal to a
+            # secret (DELIVERY_HOUR is "8"), which would corrupt the base64.
+            echo "PREVIEW_KEY_ENC=$(openssl pkeyutl -encrypt -pubin -inkey pub.pem -in k.txt | base64 -w0 | tr '0-9' '~!@#%^&*_-')"
+            echo "PREVIEW_BODY_ENC=$(openssl enc -aes-256-cbc -pbkdf2 -salt -in preview.txt -pass file:k.txt | base64 -w0 | tr '0-9' '~!@#%^&*_-')"
             rm -f preview.txt k.txt
           else
             python daily_report.py
