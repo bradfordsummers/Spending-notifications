@@ -136,12 +136,15 @@ def main():
         print(body)
         print("-" * 40)
 
-    if not recipients():
+    if config.EMAIL_ONLY:
+        # Manual test of the monthly email: skip the text entirely.
+        print("EMAIL_ONLY set - not texting.")
+    elif not recipients():
         print(f"No recipients set for channel '{config.DELIVERY_CHANNEL}' - nothing sent.")
         return
-
-    send_sms(body, subject)
-    print(f"Sent {report} report to {len(recipients())} recipient(s) via {config.DELIVERY_CHANNEL}.")
+    else:
+        send_sms(body, subject)
+        print(f"Sent {report} report to {len(recipients())} recipient(s) via {config.DELIVERY_CHANNEL}.")
 
     email_failed = False
     if email and config.REPORT_EMAIL_TO:

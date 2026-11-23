@@ -34,6 +34,10 @@ on:
         description: "Build the report but send nothing"
         type: boolean
         default: false
+      email_only:
+        description: "Monthly email only, no text (for testing the email)"
+        type: boolean
+        default: false
       preview_key:
         description: "Base64 RSA public key. A dry run's output is encrypted to it, since this repo's logs are public."
         type: string
@@ -87,6 +91,7 @@ jobs:
           REPORT: ${{ inputs.report || 'auto' }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
           PREVIEW_KEY: ${{ inputs.preview_key }}
+          EMAIL_ONLY: ${{ inputs.email_only && '1' || '0' }}
           MONTHLY_BUDGET: ${{ secrets.MONTHLY_BUDGET }}
           TIMEZONE: ${{ secrets.TIMEZONE }}
           DELIVERY_HOUR: ${{ secrets.DELIVERY_HOUR }}

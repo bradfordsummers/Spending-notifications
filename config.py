@@ -83,6 +83,8 @@ REPORT_EMAIL_TO = [
 REPORT = (os.environ.get("REPORT") or "auto").strip().lower()
 # If "1", build the report and print it instead of sending anything.
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
+# If "1", send only the monthly email, no text (manual tests).
+EMAIL_ONLY = os.environ.get("EMAIL_ONLY", "0") == "1"
 # True inside GitHub Actions, whose logs are public for this repo.
 IN_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 # If "1", skip the delivery-window guard (used for manual test runs).
