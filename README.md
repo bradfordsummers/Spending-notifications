@@ -1,13 +1,23 @@
 # Spending Notifications
 
-Texts one daily summary of spending on the Bank of America Alaska Airlines card
-vs a **$6,600/month** card budget. Live since 2026-07-22.
+Texts one summary a day about spending on the Bank of America Alaska Airlines
+card vs a **$6,600/month** card budget. Live since 2026-07-22.
+
+| Day | Text |
+|-----|------|
+| Most days | Short daily: money left, days to go, % of budget, month total, yesterday |
+| Mondays | Weekly: last Mon-Sun total and its % of the monthly budget, month-to-date %, top 10 purchases, top 10 vendors by visits |
+| The 2nd | Monthly: last month vs budget, top 10 purchases, top 10 vendors. Plus a detailed HTML email with a CSV of every transaction to `REPORT_EMAIL_TO` |
+
+The 2nd, not the 1st, because BoA data lands about a day late. One text per
+day either way (the A2P campaign registers ~1 msg/day, no links).
 
 ```
-Spending
+Spending Notifications
+$2,508 left
+12 days to go
 62% of $6,600 budget
-$2,508 left, 12 days to go
-This month: $4,092 of $6,600
+This month: $4,092
 Yesterday: $247.83
 ```
 
@@ -17,7 +27,8 @@ Yesterday: $247.83
 
 | File | Purpose |
 |------|---------|
-| `daily_report.py` | The job: fetch → budget math → send. Entry point. |
+| `daily_report.py` | The job: pick today's report, fetch, send. Entry point. |
+| `reports.py` | Spend rules and the daily/weekly/monthly text + monthly email builders. |
 | `notify.py` | Delivery. Only file that knows about channels. |
 | `config.py` | Env vars (`.env` locally, repo Secrets in CI). |
 | `plaid_client.py` | Builds the Plaid API client. |
@@ -49,8 +60,15 @@ drops runs. So: five cron slots across the morning, each run sends only if the
 the first successful send writes `.sent-marker`, cached per-day, so backstop runs
 skip. Fixes an earlier bug where exact-hour matching silently sent nothing.
 
-**Report is summary-only.** Previously itemized every purchase; simplified
-2026-08-18 to the four-line summary above.
+**Logs are public, so reports aren't printed in CI.** The repo is public (needed
+for the GitHub Pages opt-in site the A2P campaign points at), so Actions logs
+are too. Scheduled runs only log "sent" lines with masked recipients. To see a
+report on real data, run the workflow by hand with `dry_run` and `preview_key`
+(a base64 RSA public key): the output is printed encrypted to that key. Digits
+in it are swapped for symbols because GitHub masks any text equal to a secret,
+and `DELIVERY_HOUR` is `8`. Decrypt with the private key: `tr '~!@#%^&*_-'
+'0-9' | base64 -d`, then `openssl pkeyutl -decrypt` for the AES key and
+`openssl enc -d -aes-256-cbc -pbkdf2` for the body.
 
 **"Yesterday" is often incomplete.** Plaid refreshes BoA only ~once/day on its
 own schedule, so at 8 AM yesterday's charges may not have landed. Accepted
@@ -83,7 +101,8 @@ python -m venv .venv; .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env    # then fill it in
 python link_card.py       # once — prints PLAID_ACCESS_TOKEN into .env
-FORCE_SEND=1 python daily_report.py    # test
+FORCE_SEND=1 python daily_report.py    # test (sends)
+$env:DRY_RUN=1; $env:REPORT='weekly'; python daily_report.py   # preview, sends nothing
 ```
 
 Push secrets to the cloud with `gh secret set -f .env`.
