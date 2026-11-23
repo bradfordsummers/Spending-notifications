@@ -164,7 +164,7 @@ def _send_twilio(to_number, subject, body) -> bool:
             raise RuntimeError(f"HTTP {e.code}: {detail}") from e
 
         sid = msg.get("sid", "?")
-        print(f"  .. {to_number}: queued ({sid})")
+        print(f"  .. {_mask(to_number)}: queued ({sid})")
         status, error = _wait_for_final_status(f"{base}/Messages/{sid}.json", msg)
         if status in ("undelivered", "failed"):
             # Not delivered, so a retry can't cause a duplicate text.
@@ -174,9 +174,9 @@ def _send_twilio(to_number, subject, body) -> bool:
         if status not in ("sent", "delivered"):
             # Still in flight at timeout. Count it as sent rather than risk a
             # duplicate; check the Twilio console log if it never arrives.
-            print(f"  .. {to_number}: still '{status}' after {_STATUS_TIMEOUT_SECONDS}s")
+            print(f"  .. {_mask(to_number)}: still '{status}' after {_STATUS_TIMEOUT_SECONDS}s")
         else:
-            print(f"  .. {to_number}: {status}")
+            print(f"  .. {_mask(to_number)}: {status}")
     return _with_retries(to_number, attempt)
 
 
@@ -196,6 +196,20 @@ def _wait_for_final_status(url, msg):
 
 # --- shared ---------------------------------------------------------------
 
+def _mask(target: str) -> str:
+    """Recipients as shown in logs (public for this repo): last 4 digits of a
+    phone number, first letter + domain of an email address."""
+    out = []
+    for x in target.split(","):
+        x = x.strip()
+        if "@" in x:
+            local, domain = x.split("@", 1)
+            out.append(f"{local[:1]}***@{domain}")
+        else:
+            out.append("***" + "".join(c for c in x if c.isdigit())[-4:])
+    return ", ".join(out)
+
+
 class _NoRetry(Exception):
     pass
 
@@ -204,15 +218,15 @@ def _with_retries(target, attempt) -> bool:
     for n in range(1, _MAX_ATTEMPTS + 1):
         try:
             attempt()
-            print(f"  -> {target}: sent")
+            print(f"  -> {_mask(target)}: sent")
             return True
         except _NoRetry as e:
-            print(f"  !! {target}: FAILED - {e}")
+            print(f"  !! {_mask(target)}: FAILED - {e}")
             return False
         except Exception as e:  # noqa: BLE001 - retry then report
             if n < _MAX_ATTEMPTS:
-                print(f"  .. {target}: attempt {n} failed ({e}); retrying")
+                print(f"  .. {_mask(target)}: attempt {n} failed ({e}); retrying")
                 time.sleep(_RETRY_SECONDS)
             else:
-                print(f"  !! {target}: FAILED after {n} attempts - {e}")
+                print(f"  !! {_mask(target)}: FAILED after {n} attempts - {e}")
     return False
