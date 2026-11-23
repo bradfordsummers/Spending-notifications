@@ -74,6 +74,17 @@ DELIVERY_HOUR = int(os.environ.get("DELIVERY_HOUR", "8"))
 # delivers (the per-day .sent-marker keeps it to one text). 14 => 08:00-21:59
 # local: sends in the morning when GitHub is on time, otherwise later that day.
 DELIVERY_WINDOW_HOURS = int(os.environ.get("DELIVERY_WINDOW_HOURS", "14"))
+# Comma-separated addresses that get the detailed monthly report email
+# (sent from EMAIL_FROM on the 2nd). Empty = no email.
+REPORT_EMAIL_TO = [
+    a.strip() for a in os.environ.get("REPORT_EMAIL_TO", "").split(",") if a.strip()
+]
+# Force a report type: "daily", "weekly" or "monthly". Empty/"auto" = by date.
+REPORT = (os.environ.get("REPORT") or "auto").strip().lower()
+# If "1", build the report and print it instead of sending anything.
+DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
+# True inside GitHub Actions, whose logs are public for this repo.
+IN_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 # If "1", skip the delivery-window guard (used for manual test runs).
 FORCE_SEND = os.environ.get("FORCE_SEND", "0") == "1"
 # When set, a successful scheduled send writes this file. The workflow caches

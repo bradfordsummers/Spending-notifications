@@ -1,9 +1,14 @@
-"""The daily job: pull the card's transactions, do the budget math, send the SMS.
+"""The daily job: pull the card's transactions, build today's report, send it.
+
+Which report goes out depends on the date (one text per day either way):
+  the 2nd of the month -> monthly summary text + detailed report by email
+  Mondays              -> weekly summary
+  every other day      -> the short daily
 
 Run manually to test:   python daily_report.py
+Preview without sending: DRY_RUN=1 REPORT=weekly python daily_report.py
 In the cloud it's run on a schedule by .github/workflows/daily.yml.
 """
-import calendar
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -14,7 +19,8 @@ from plaid.model.transactions_get_request_options import (
 
 import config
 from plaid_client import make_client
-from notify import recipients, send_sms
+import reports
+from notify import recipients, send_email, send_sms
 
 
 def fetch_transactions(client, start: date, end: date):
@@ -42,85 +48,6 @@ def fetch_transactions(client, start: date, end: date):
     return results
 
 
-# Plaid categories that are money movement, not spending: account transfers and
-# credit-card payments. These can arrive as POSITIVE amounts (e.g. a $6,000 card
-# payment once did) and would otherwise inflate the total, so they're excluded.
-_NON_SPEND = {"TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"}
-# ...except these, which pay for real purchases and DO count as spending:
-# Venmo/app payments and buy-now-pay-later installments (Afterpay, Klarna).
-_COUNTS_AS_SPEND = {"TRANSFER_OUT_TRANSFER_OUT_FROM_APPS", "LOAN_PAYMENTS_BNPL"}
-
-
-def _is_purchase(t) -> bool:
-    """True for spending: a positive amount that isn't a transfer or card
-    payment. Refunds come through negative and are excluded by the sign."""
-    if float(t.amount) <= 0:
-        return False
-    pfc = getattr(t, "personal_finance_category", None)
-    if not pfc:
-        return True
-    return pfc.primary not in _NON_SPEND or pfc.detailed in _COUNTS_AS_SPEND
-
-
-def _spend(transactions) -> float:
-    """Sum of actual purchases (excludes transfers and payments)."""
-    return sum(float(t.amount) for t in transactions if _is_purchase(t))
-
-
-def _txn_date(t):
-    """The real purchase date we bucket a transaction under. BoA leaves
-    `authorized_date` null but populates `authorized_datetime` with the actual
-    purchase moment, which stays fixed as the transaction moves pending ->
-    posted (so a charge never lands on two different days). Fall back to
-    `authorized_date`, then the posted `date`, if the datetime is missing."""
-    adt = getattr(t, "authorized_datetime", None)
-    if adt is not None:
-        if adt.tzinfo is not None:
-            adt = adt.astimezone(ZoneInfo(config.TIMEZONE))
-        return adt.date()
-    return getattr(t, "authorized_date", None) or t.date
-
-
-def build_report(transactions, today: date):
-    first_of_month = today.replace(day=1)
-    yesterday = today - timedelta(days=1)
-
-    # Bucket by purchase date (authorized_datetime). Banks report charges on a
-    # delay, so "yesterday" may be incomplete at send time -- an accepted
-    # tradeoff for a clean single-day list.
-    yday_txns = [t for t in transactions if _txn_date(t) == yesterday]
-    mtd_txns = [t for t in transactions if first_of_month <= _txn_date(t) <= today]
-
-    yday_spend = _spend(yday_txns)
-    mtd_spend = _spend(mtd_txns)
-
-    budget = config.MONTHLY_BUDGET
-    remaining = budget - mtd_spend
-    pct = (mtd_spend / budget * 100) if budget else 0
-    days_in_month = calendar.monthrange(today.year, today.month)[1]
-    days_left = days_in_month - today.day + 1
-
-    # Plain ASCII only: keeps SMS in the cheap GSM-7 encoding (160 chars/segment
-    # vs 70 for Unicode) and displays cleanly in the Windows console.
-    # This becomes the email SUBJECT, which carrier gateways show as a "/ ... /"
-    # title bar at the top of the text. Sent every morning, so no date needed.
-    subject = "Spending"
-
-    # Blank first line so there's a break under the "Spending" title, then one
-    # fact per line: money left, days to go, % of budget, month total, yesterday.
-    lines = [""]
-    if remaining >= 0:
-        lines.append(f"${remaining:,.0f} left")
-    else:
-        lines.append(f"${-remaining:,.0f} over budget")
-    lines.append(f"{days_left} days to go")
-    lines.append(f"{pct:.0f}% of ${budget:,.0f} budget")
-    lines.append(f"This month: ${mtd_spend:,.0f}")
-    lines.append(f"Yesterday: ${yday_spend:,.2f}")
-
-    return subject, "\n".join(lines)
-
-
 def _mark_sent(today: date) -> None:
     """Record that today's report went out, so the workflow's backstop runs
     skip. No-op unless SENT_MARKER_FILE is set (i.e. only in the cloud)."""
@@ -133,17 +60,37 @@ def _mark_sent(today: date) -> None:
         print(f"  (could not write sent-marker {config.SENT_MARKER_FILE}: {e})")
 
 
+def pick_report(today: date) -> str:
+    if config.REPORT in ("daily", "weekly", "monthly"):
+        return config.REPORT
+    if today.day == 2:
+        # The 2nd, not the 1st: BoA data lands about a day late, so on the 1st
+        # the last day of the month is often still missing.
+        return "monthly"
+    if today.weekday() == 0:
+        return "weekly"
+    return "daily"
+
+
+def fetch_start(report: str, today: date) -> date:
+    first_of_month = today.replace(day=1)
+    if report == "monthly":
+        # Last month plus the month before it, for the comparison.
+        return reports.prev_month(reports.prev_month(today)[0])[0]
+    if report == "weekly":
+        return min(first_of_month, reports.last_week(today)[0])
+    return min(first_of_month, today - timedelta(days=1))
+
+
 def main():
     now_local = datetime.now(ZoneInfo(config.TIMEZONE))
     today = now_local.date()
 
-    # Send on ANY run at or after the delivery hour, within a morning window --
-    # not only when the hour matches exactly. GitHub Actions fires cron jobs
-    # late, so an 8 AM job may not run until 9 or 10; ">=" lets that late run
-    # still send. The workflow's once-per-day cache guard stops the backstop
-    # runs from sending a duplicate.
+    # Send on ANY run inside the local send window, not only when the hour
+    # matches exactly: GitHub fires cron jobs late. The workflow's once-per-day
+    # cache guard stops the backstop runs from sending a duplicate.
     window_end = config.DELIVERY_HOUR + config.DELIVERY_WINDOW_HOURS
-    if not config.FORCE_SEND and not (
+    if not (config.FORCE_SEND or config.DRY_RUN) and not (
         config.DELIVERY_HOUR <= now_local.hour < window_end
     ):
         print(
@@ -153,28 +100,66 @@ def main():
         )
         return
 
+    report = pick_report(today)
     client = make_client()
-    # Fetch a window covering both 'yesterday' and 'this month' in one call.
-    first_of_month = today.replace(day=1)
-    start = min(first_of_month, today - timedelta(days=1))
-    transactions = fetch_transactions(client, start, today)
+    transactions = fetch_transactions(client, fetch_start(report, today), today)
 
-    subject, body = build_report(transactions, today)
-    print(subject)
-    print(body)
-    print("-" * 40)
+    email = None
+    if report == "monthly":
+        email = reports.build_monthly_email(transactions, today)
+        subject, body = reports.build_monthly_text(
+            transactions, today, emailed=bool(config.REPORT_EMAIL_TO)
+        )
+    elif report == "weekly":
+        subject, body = reports.build_weekly(transactions, today)
+    else:
+        subject, body = reports.build_daily(transactions, today)
+
+    if config.DRY_RUN:
+        print(f"[DRY RUN - nothing sent] {report} report")
+        print(f"--- text ({len(body)} chars) ---")
+        print(config.SMS_PROGRAM_NAME)
+        print(body.lstrip("\n"))
+        if email:
+            e_subject, e_text, _, csv_bytes, csv_name = email
+            rows = csv_bytes.count(b"\n") - 1
+            print(f"--- email: {e_subject} (attachment {csv_name}, {rows} transactions) ---")
+            print(e_text)
+        return
+
+    # The repo is public, so its Actions logs are too: only print the report
+    # itself when running locally.
+    if config.IN_CI:
+        print(f"Built {report} report ({len(body)} chars).")
+    else:
+        print(subject)
+        print(body)
+        print("-" * 40)
 
     if not recipients():
-        print(f"No recipients set for channel '{config.DELIVERY_CHANNEL}' - printed only, nothing sent.")
+        print(f"No recipients set for channel '{config.DELIVERY_CHANNEL}' - nothing sent.")
         return
 
     send_sms(body, subject)
-    print(f"Sent to {len(recipients())} recipient(s) via {config.DELIVERY_CHANNEL}.")
+    print(f"Sent {report} report to {len(recipients())} recipient(s) via {config.DELIVERY_CHANNEL}.")
 
-    # Mark the day done so the backstop runs skip. Skip for manual FORCE_SEND
-    # tests so a test run never suppresses the morning send.
+    email_failed = False
+    if email and config.REPORT_EMAIL_TO:
+        e_subject, e_text, e_html, csv_bytes, csv_name = email
+        try:
+            send_email(config.REPORT_EMAIL_TO, e_subject, e_text, e_html,
+                       [(csv_name, csv_bytes, "text", "csv")])
+            print(f"Emailed monthly report to {len(config.REPORT_EMAIL_TO)} address(es).")
+        except Exception as e:  # noqa: BLE001 - text already went out
+            print(f"!! Monthly report email failed: {e}")
+            email_failed = True
+
+    # Mark the day done so the backstop runs skip (even if only the email
+    # failed: re-running would text everyone again). Skip for manual tests.
     if not config.FORCE_SEND:
         _mark_sent(today)
+    if email_failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

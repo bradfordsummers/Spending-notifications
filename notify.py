@@ -86,6 +86,29 @@ def _send_email(context, to_addr, subject, body) -> bool:
     return _with_retries(to_addr, attempt)
 
 
+def send_email(to_addrs, subject, text, html_body, attachments=()) -> None:
+    """Send a regular email (the monthly report) from EMAIL_FROM via Gmail
+    SMTP. attachments: [(filename, bytes, maintype, subtype)]."""
+    if not config.EMAIL_FROM or not config.EMAIL_APP_PASSWORD:
+        raise RuntimeError("Missing EMAIL_FROM / EMAIL_APP_PASSWORD")
+    msg = EmailMessage()
+    msg["From"] = config.EMAIL_FROM
+    msg["To"] = ", ".join(to_addrs)
+    msg["Subject"] = subject
+    msg.set_content(text)
+    msg.add_alternative(html_body, subtype="html")
+    for name, data, maintype, subtype in attachments:
+        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
+
+    def attempt():
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(config.EMAIL_HOST, config.EMAIL_PORT, context=context) as server:
+            server.login(config.EMAIL_FROM, config.EMAIL_APP_PASSWORD)
+            server.send_message(msg)
+    if not _with_retries(", ".join(to_addrs), attempt):
+        raise RuntimeError("email not sent")
+
+
 # --- Twilio ---------------------------------------------------------------
 
 def _check_twilio_config() -> None:
